@@ -16,26 +16,26 @@ generation process is fraught with conditionals and loops. Here's a simple
 example:
 
 ``` ruby
-Jbuilder.encode do |json|
-  json.content format_content(@message.content)
-  json.(@message, :created_at, :updated_at)
+# app/views/message/show.json.jbuilder
 
-  json.author do
-    json.name @message.creator.name.familiar
-    json.email_address @message.creator.email_address_with_name
-    json.url url_for(@message.creator, format: :json)
-  end
+json.content format_content(@message.content)
+json.(@message, :created_at, :updated_at)
 
-  if current_user.admin?
-    json.visitors calculate_visitors(@message)
-  end
+json.author do
+  json.name @message.creator.name.familiar
+  json.email_address @message.creator.email_address_with_name
+  json.url url_for(@message.creator, format: :json)
+end
 
-  json.comments @message.comments, :content, :created_at
+if current_user.admin?
+  json.visitors calculate_visitors(@message)
+end
 
-  json.attachments @message.attachments do |attachment|
-    json.filename attachment.filename
-    json.url url_for(attachment)
-  end
+json.comments @message.comments, :content, :created_at
+
+json.attachments @message.attachments do |attachment|
+  json.filename attachment.filename
+  json.url url_for(attachment)
 end
 ```
 
@@ -80,19 +80,26 @@ end
 Top level arrays can be handled directly.  Useful for index and other collection actions.
 
 ``` ruby
-# @people = People.all
-json.array! @people do |person|
-  json.name person.name
-  json.age calculate_age(person.birthday)
+# @comments = @post.comments
+
+json.array! @comments do |comment|
+  next if comment.marked_as_spam_by?(current_user)
+
+  json.body comment.body
+  json.author do
+    json.first_name comment.author.first_name
+    json.last_name comment.author.last_name
+  end
 end
 
-# => [ { "name": "David", "age": 32 }, { "name": "Jamie", "age": 31 } ]
+# => [ { "body": "great post...", "author": { "first_name": "Joe", "last_name": "Bloe" }} ]
 ```
 
 You can also extract attributes from array directly.
 
 ``` ruby
 # @people = People.all
+
 json.array! @people, :id, :name
 
 # => [ { "id": 1, "name": "David" }, { "id": 2, "name": "Jamie" } ]
@@ -173,6 +180,17 @@ json.partial! partial: 'posts/post', collection: @posts, as: :post
 
 json.comments @post.comments, partial: 'comment/comment', as: :comment
 ```
+
+You can pass any objects into partial templates with or without `:locals` option.
+
+```ruby
+json.partial! 'sub_template', locals: { user: user }
+
+# or
+
+json.partial! 'sub_template', user: user
+```
+
 
 You can explicitly make Jbuilder object return null if you want:
 

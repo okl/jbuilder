@@ -1,5 +1,62 @@
 # Changelog
 
+2.2.12
+------
+
+* [Replace explici block calls with yield for performance](https://github.com/rails/jbuilder/commit/3184f941276ad03a071cf977133d1a32302afa47)
+
+2.2.11
+------
+
+* Generate the templates for Rails 5+ [#258](https://github.com/rails/jbuilder/pull/258) [@amatsuda](https://github.com/amatsuda)
+
+2.2.10
+------
+
+* Add Jbuilder::Blank#empty? to tell if attributes are empty [#257](https://github.com/rails/jbuilder/pull/257) [@a2ikm](https://github.com/a2ikm)
+
+2.2.9
+-----
+
+* Support `partial!` call with `locals` option in `JbuilderTemplate` [#251](https://github.com/rails/jbuilder/pull/251)
+
+2.2.8
+-----
+* [Raise ArrayError when trying to add key to an array](https://github.com/rails/jbuilder/commit/869e4be1ad165ce986d8fca78311bdd3ed166087)
+
+2.2.7
+-----
+* [Make Blank object serializable with Marshal](https://github.com/rails/jbuilder/commit/7083f28d8b665aa60d0d1b1927ae88bb5c6290ba)
+
+2.2.6
+-----
+* [Make sure dependency tracker loads after template handler](https://github.com/rails/jbuilder/commit/3ba404b1207b557e14771c90b8832bc01ae67a42)
+
+2.2.5
+-----
+* [Refactor merge block behavior to raise error for unexpected values](https://github.com/rails/jbuilder/commit/4503162fb26f53f613fc83ac081fd244748b6fe9)
+
+2.2.4
+-----
+* [Typecast locals hash key during collection render](https://github.com/rails/jbuilder/commit/a6b0c8651a08e01cb53eee38e211c65423f275f7)
+
+2.2.3
+-----
+* [Move template handler registration into railtie](https://github.com/rails/jbuilder/commit/c8acc5cea6da2a79b7b345adc301cb5ff2517647)
+* [Do not capture the block where it is possible](https://github.com/rails/jbuilder/commit/973b382c3924cb59fc0e4e25266b18e74d41d646)
+
+2.2.2
+-----
+* [Fix `Jbuilder#merge!` inside block](https://github.com/rails/jbuilder/commit/a7b328552eb0d36315f75bff813bea7eecf8c1d7)
+
+2.2.1
+-----
+* [Fix empty block handling](https://github.com/rails/jbuilder/commit/972a11141403269e9b17b45b0c95f8a9788245ee)
+
+2.2.0
+-----
+* [Allow to skip `array!` iterations by calling `next`](https://github.com/rails/jbuilder/commit/81a63308fb9d5002519dd871f829ccc58067251a)
+
 2.1.2
 -----
 * [Cast array-like objects to array before merging](https://github.com/rails/jbuilder/commit/7b8c8a1cb09b7f3dd26e5643ebbd6b2ec67185db)

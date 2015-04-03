@@ -1,4 +1,5 @@
 require 'jbuilder/jbuilder'
+require 'jbuilder/blank'
 require 'jbuilder/key_formatter'
 require 'jbuilder/errors'
 require 'multi_json'
@@ -8,28 +9,28 @@ class Jbuilder
   @@key_formatter = KeyFormatter.new
   @@ignore_nil    = false
 
-  def initialize(options = {}, &block)
+  def initialize(options = {})
     @attributes = {}
 
     @key_formatter = options.fetch(:key_formatter){ @@key_formatter.clone }
     @ignore_nil = options.fetch(:ignore_nil, @@ignore_nil)
 
-    yield self if block
+    yield self if ::Kernel.block_given?
   end
 
   # Yields a builder and automatically turns the result into a JSON string
-  def self.encode(*args, &block)
-    new(*args, &block).target!
+  def self.encode(*args)
+    new(*args, &::Proc.new).target!
   end
 
-  BLANK = ::Object.new
+  BLANK = Blank.new
 
-  def set!(key, value = BLANK, *args, &block)
-    result = if block
-      if BLANK != value
+  def set!(key, value = BLANK, *args)
+    result = if ::Kernel.block_given?
+      if !_blank?(value)
         # json.comments @post.comments { |comment| ... }
         # { "comments": [ { ... }, { ... } ] }
-        _scope{ array! value, &block }
+        _scope{ array! value, &::Proc.new }
       else
         # json.comments { ... }
         # { "comments": ... }
@@ -174,11 +175,11 @@ class Jbuilder
   #   json.array! [1, 2, 3]
   #
   #   [1,2,3]
-  def array!(collection = [], *attributes, &block)
+  def array!(collection = [], *attributes)
     array = if collection.nil?
       []
-    elsif block
-      _map_collection(collection, &block)
+    elsif ::Kernel.block_given?
+      _map_collection(collection, &::Proc.new)
     elsif attributes.any?
       _map_collection(collection) { |element| extract! element, *attributes }
     else
@@ -213,9 +214,9 @@ class Jbuilder
     end
   end
 
-  def call(object, *attributes, &block)
-    if block
-      array! object, &block
+  def call(object, *attributes)
+    if ::Kernel.block_given?
+      array! object, &::Proc.new
     else
       extract! object, *attributes
     end
@@ -253,19 +254,25 @@ class Jbuilder
     attributes.each{ |key| _set_value key, object.public_send(key) }
   end
 
-  def _merge_block(key, &block)
-    current_value = _read(key, {})
+  def _merge_block(key)
+    current_value = _blank? ? BLANK : @attributes.fetch(_key(key), BLANK)
     raise NullError.build(key) if current_value.nil?
-    value = _scope{ yield self }
-    value.nil? ? value : _merge_values(current_value, value)
+    new_value = _scope{ yield self }
+    _merge_values(current_value, new_value)
   end
 
-  def _read(key, default = nil)
-    @attributes.fetch(_key(key)){ default }
-  end
-
-  def _write(key, value)
-    @attributes[_key(key)] = value
+  def _merge_values(current_value, updates)
+    if _blank?(updates)
+      current_value
+    elsif _blank?(current_value) || updates.nil?
+      updates
+    elsif ::Array === updates
+      ::Array === current_value ? current_value + updates : updates
+    elsif ::Hash === current_value
+      current_value.merge(updates)
+    else
+      raise "Can't merge #{updates.inspect} with #{current_value.inspect}"
+    end
   end
 
   def _key(key)
@@ -274,22 +281,22 @@ class Jbuilder
 
   def _set_value(key, value)
     raise NullError.build(key) if @attributes.nil?
-    return if @ignore_nil && value.nil?
-
+    raise ArrayError.build(key) if ::Array === @attributes
+    return if @ignore_nil && value.nil? or _blank?(value)
+    @attributes = {} if _blank?
     value = value.to_f if value.is_a? ::BigDecimal
-
-    _write key, value
+    @attributes[_key(key)] = value
   end
 
   def _map_collection(collection)
     collection.map do |element|
       _scope{ yield element }
-    end
+    end - [BLANK]
   end
 
   def _scope
     parent_attributes, parent_formatter = @attributes, @key_formatter
-    @attributes = {}
+    @attributes = BLANK
     yield
     @attributes
   ensure
@@ -300,20 +307,9 @@ class Jbuilder
     value.respond_to?(:map)
   end
 
-  def _merge_values(attributes, hash_or_array)
-    attributes = attributes.dup
-
-    if ::Array === hash_or_array
-      attributes = [] unless ::Array === attributes
-      attributes.concat hash_or_array
-    else
-      attributes.update hash_or_array
-    end
-
-    attributes
+  def _blank?(value=@attributes)
+    BLANK == value
   end
 end
 
-require 'jbuilder/jbuilder_template' if defined?(ActionView::Template)
-require 'jbuilder/dependency_tracker'
-require 'jbuilder/railtie' if defined?(Rails::VERSION::MAJOR) && Rails::VERSION::MAJOR == 4
+require 'jbuilder/railtie' if defined?(Rails)

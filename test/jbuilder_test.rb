@@ -142,6 +142,17 @@ class JbuilderTest < ActiveSupport::TestCase
     assert_equal 32, result['author']['age']
   end
 
+  test 'empty block handling' do
+    result = jbuild do |json|
+      json.foo 'bar'
+      json.author do
+      end
+    end
+
+    assert_equal 'bar', result['foo']
+    assert !result.key?('author')
+  end
+
   test 'blocks are additive' do
     result = jbuild do |json|
       json.author do
@@ -155,6 +166,24 @@ class JbuilderTest < ActiveSupport::TestCase
 
     assert_equal 'David', result['author']['name']
     assert_equal 32, result['author']['age']
+  end
+
+  test 'support merge! method' do
+    result = jbuild do |json|
+      json.merge! 'foo' => 'bar'
+    end
+
+    assert_equal 'bar', result['foo']
+  end
+
+  test 'support merge! method in a block' do
+    result = jbuild do |json|
+      json.author do
+        json.merge! 'name' => 'Pavel'
+      end
+    end
+
+    assert_equal 'Pavel', result['author']['name']
   end
 
   test 'blocks are additive via extract syntax' do
@@ -380,6 +409,20 @@ class JbuilderTest < ActiveSupport::TestCase
       end
     end
 
+    assert_equal 'hello', result.first['content']
+    assert_equal 'world', result.second['content']
+  end
+
+  test 'it allows using next in array block to skip value' do
+    comments = [ Comment.new('hello', 1), Comment.new('skip', 2), Comment.new('world', 3) ]
+    result = jbuild do |json|
+      json.array! comments do |comment|
+        next if comment.id == 2
+        json.content comment.content
+      end
+    end
+
+    assert_equal 2, result.length
     assert_equal 'hello', result.first['content']
     assert_equal 'world', result.second['content']
   end
@@ -613,11 +656,28 @@ class JbuilderTest < ActiveSupport::TestCase
     assert_nil result['author']
   end
 
+  test 'empty attributes respond to empty?' do
+    attributes = Jbuilder.new.attributes!
+    assert attributes.empty?
+    assert attributes.blank?
+    assert !attributes.present?
+  end
+
+  test 'throws ArrayError when trying to add a key to an array' do
+    assert_raise Jbuilder::ArrayError do
+      jbuild do |json|
+        json.array! %w[foo bar]
+        json.fizz "buzz"
+      end
+    end
+  end
+
   test 'throws NullError when trying to add properties to null' do
-    json = Jbuilder.new
-    json.null!
     assert_raise Jbuilder::NullError do
-      json.foo 'bar'
+      jbuild do |json|
+        json.null!
+        json.foo 'bar'
+      end
     end
   end
 

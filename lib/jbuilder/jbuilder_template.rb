@@ -9,19 +9,24 @@ class JbuilderTemplate < Jbuilder
 
   self.template_lookup_options = { handlers: [:jbuilder] }
 
-  def initialize(context, *args, &block)
+  def initialize(context, *args)
     @context = context
-    super(*args, &block)
+    super(*args)
   end
 
   def partial!(name_or_options, locals = {})
     case name_or_options
     when ::Hash
-      # partial! partial: 'name', locals: { foo: 'bar' }
+      # partial! partial: 'name', foo: 'bar'
       options = name_or_options
     else
+      # partial! 'name', locals: {foo: 'bar'}
+      if locals.one? && (locals.keys.first == :locals)
+        options = locals.merge(partial: name_or_options)
+      else
+        options = { partial: name_or_options, locals: locals }
+      end
       # partial! 'name', foo: 'bar'
-      options = { partial: name_or_options, locals: locals }
       as = locals.delete(:as)
       options[:as] = as if as.present?
       options[:collection] = locals[:collection] if locals.key?(:collection)
@@ -30,7 +35,7 @@ class JbuilderTemplate < Jbuilder
     _render_partial_with_options options
   end
 
-  def array!(collection = [], *attributes, &block)
+  def array!(collection = [], *attributes)
     options = attributes.extract_options!
 
     if options.key?(:partial)
@@ -48,7 +53,7 @@ class JbuilderTemplate < Jbuilder
   #   json.cache! ['v1', @person], expires_in: 10.minutes do
   #     json.extract! @person, :name, :age
   #   end
-  def cache!(key=nil, options={}, &block)
+  def cache!(key=nil, options={})
     if @context.controller.perform_caching
       value = ::Rails.cache.fetch(_cache_key(key, options), options) do
         _scope { yield self }
@@ -69,8 +74,8 @@ class JbuilderTemplate < Jbuilder
   #   json.cache_if! !admin?, @person, expires_in: 10.minutes do
   #     json.extract! @person, :name, :age
   #   end
-  def cache_if!(condition, *args, &block)
-    condition ? cache!(*args, &block) : yield
+  def cache_if!(condition, *args)
+    condition ? cache!(*args, &::Proc.new) : yield
   end
 
   protected
@@ -81,6 +86,7 @@ class JbuilderTemplate < Jbuilder
     as = options[:as]
 
     if as && options.key?(:collection)
+      as = as.to_sym
       collection = options.delete(:collection)
       locals = options.delete(:locals)
       array! collection do |member|
@@ -137,5 +143,3 @@ class JbuilderHandler
       json.target! unless (__already_defined && __already_defined != "method")}
   end
 end
-
-ActionView::Template.register_template_handler :jbuilder, JbuilderHandler

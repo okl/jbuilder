@@ -5,7 +5,6 @@ require 'action_view/testing/resolvers'
 require 'active_support/cache'
 require 'jbuilder/jbuilder_template'
 
-
 BLOG_POST_PARTIAL = <<-JBUILDER
   json.extract! blog_post, :id, :body
   json.author do
@@ -25,6 +24,8 @@ blog_authors = [ 'David Heinemeier Hansson', 'Pavel Pravosud' ].cycle
 BLOG_POST_COLLECTION = 10.times.map{ |i| BlogPost.new(i+1, "post body #{i+1}", blog_authors.next) }
 COLLECTION_COLLECTION = 5.times.map{ |i| Collection.new(i+1, "collection #{i+1}") }
 
+ActionView::Template.register_template_handler :jbuilder, JbuilderHandler
+
 module Rails
   def self.cache
     @cache ||= ActiveSupport::Cache::MemoryStore.new
@@ -39,7 +40,7 @@ class JbuilderTemplateTest < ActionView::TestCase
 
   def partials
     {
-      '_partial.json.jbuilder'  => 'json.content "hello"',
+      '_partial.json.jbuilder'  => 'foo ||= "hello"; json.content foo',
       '_blog_post.json.jbuilder' => BLOG_POST_PARTIAL,
       '_collection.json.jbuilder' => COLLECTION_PARTIAL
     }
@@ -109,9 +110,33 @@ class JbuilderTemplateTest < ActionView::TestCase
     assert_equal 'hello', MultiJson.load(json)['content']
   end
 
+  test 'partial! + locals via :locals option' do
+    json = render_jbuilder <<-JBUILDER
+      json.partial! 'partial', locals: { foo: 'howdy' }
+    JBUILDER
+
+    assert_equal 'howdy', MultiJson.load(json)['content']
+  end
+
+  test 'partial! + locals without :locals key' do
+    json = render_jbuilder <<-JBUILDER
+      json.partial! 'partial', foo: 'goodbye'
+    JBUILDER
+
+    assert_equal 'goodbye', MultiJson.load(json)['content']
+  end
+
   test 'partial! renders collections' do
     json = render_jbuilder <<-JBUILDER
       json.partial! 'blog_post', :collection => BLOG_POST_COLLECTION, :as => :blog_post
+    JBUILDER
+
+    assert_collection_rendered json
+  end
+
+  test 'partial! renders collections when as argument is a string' do
+    json = render_jbuilder <<-JBUILDER
+      json.partial! 'blog_post', collection: BLOG_POST_COLLECTION, as: "blog_post"
     JBUILDER
 
     assert_collection_rendered json
@@ -121,6 +146,8 @@ class JbuilderTemplateTest < ActionView::TestCase
     json = render_jbuilder <<-JBUILDER
       json.partial! 'collection', collection: COLLECTION_COLLECTION, as: :collection
     JBUILDER
+
+    assert_equal 5, MultiJson.load(json).length
   end
 
   test 'partial! renders as empty array for nil-collection' do
@@ -177,6 +204,27 @@ class JbuilderTemplateTest < ActionView::TestCase
     JBUILDER
 
     assert_equal '{"posts":[]}', json
+  end
+
+  test 'cache an empty block' do
+    undef_context_methods :fragment_name_with_digest, :cache_fragment_name
+
+    render_jbuilder <<-JBUILDER
+      json.cache! 'nothing' do
+      end
+    JBUILDER
+
+    json = nil
+
+    assert_nothing_raised do
+      json = render_jbuilder <<-JBUILDER
+        json.foo 'bar'
+        json.cache! 'nothing' do
+        end
+      JBUILDER
+    end
+
+    assert_equal 'bar', MultiJson.load(json)['foo']
   end
 
   test 'fragment caching a JSON object' do
