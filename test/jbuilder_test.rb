@@ -119,6 +119,17 @@ class JbuilderTest < ActiveSupport::TestCase
     assert_equal 34, result['age']
   end
 
+  test 'big decimals are converted to floats' do
+    person = {name: 'Ryan', age: BigDecimal.new(28.5, 3)}
+
+    result = jbuild do |json|
+      json.extract! person, :name, :age
+    end
+
+    assert_equal 'Ryan', result['name']
+    assert_equal 28.5, result['age']
+  end
+
   test 'nesting single child with block' do
     result = jbuild do |json|
       json.author do

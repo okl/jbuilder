@@ -2,6 +2,7 @@ require 'jbuilder/jbuilder'
 require 'jbuilder/key_formatter'
 require 'jbuilder/errors'
 require 'multi_json'
+require 'bigdecimal'
 
 class Jbuilder
   @@key_formatter = KeyFormatter.new
@@ -274,6 +275,9 @@ class Jbuilder
   def _set_value(key, value)
     raise NullError.build(key) if @attributes.nil?
     return if @ignore_nil && value.nil?
+
+    value = value.to_f if value.is_a? ::BigDecimal
+
     _write key, value
   end
 
